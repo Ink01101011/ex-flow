@@ -4,13 +4,25 @@
   "description": "Dependency-graph execution planner using Kahn's Algorithm with priority-aware batching",
   "keywords": [
     "dag",
+    "dependency-graph",
+    "execution-plan",
     "kahn-algorithm",
+    "scheduler",
     "task-scheduler",
     "topological-sort",
-    "typescript"
+    "typescript",
+    "workflow"
   ],
+  "homepage": "https://github.com/Ink01101011/ex-flow#readme",
+  "bugs": {
+    "url": "https://github.com/Ink01101011/ex-flow/issues"
+  },
   "license": "MIT",
   "author": "",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Ink01101011/ex-flow.git"
+  },
   "files": [
     "dist",
     "README.md"
@@ -38,7 +50,8 @@
     "format:check": "oxfmt --check .",
     "prepare": "husky",
     "ci": "pnpm run format:check && pnpm run lint && pnpm run test && pnpm run build",
-    "prepublishOnly": "pnpm run clean && pnpm run ci",
+    "prepublish:check": "pnpm run clean && pnpm run ci && npm pack --dry-run",
+    "prepublishOnly": "pnpm run prepublish:check",
     "start": "node dist/index.js"
   },
   "dependencies": {
@@ -51,6 +64,9 @@
     "oxlint": "^1.19.0",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=18"
   },
   "packageManager": "pnpm@10.24.0"
 }
