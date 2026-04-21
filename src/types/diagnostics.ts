@@ -36,3 +36,27 @@ export interface ExFlowObservabilityEvent {
 
 export type ExFlowOpenTelemetryAttributes = Record<string, string | number | boolean>;
 export type ExFlowDatadogLogFields = Record<string, string | number | boolean | null>;
+export type ExFlowCustomMappedFields = Record<string, string | number | boolean | null>;
+
+export interface ExFlowDiagnosticsMapperOptions {
+  keyPrefix?: string;
+  separator?: "." | "_" | "-";
+  fieldNameMap?: Partial<
+    Record<
+      | "source"
+      | "code"
+      | "message"
+      | "name"
+      | "timestamp"
+      | "cyclePath"
+      | "unresolvedNodeIds"
+      | "invalidOptionField"
+      | "invalidOptionValue"
+      | "details",
+      string
+    >
+  >;
+  staticFields?: ExFlowCustomMappedFields;
+  includeNulls?: boolean;
+  valueTransform?: (value: unknown, key: string, event: ExFlowObservabilityEvent) => unknown;
+}

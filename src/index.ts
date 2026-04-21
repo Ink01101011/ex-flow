@@ -10,6 +10,7 @@ export { getExFlowPreset } from "./core/presets";
 export { default as ExFlowRuntimeError } from "./errors/exFlowRuntimeError";
 
 // utils
+export { createDiagnosticsMapper } from "./utils";
 export { serializeExFlowError } from "./utils";
 export { toDatadogLogFields, toOpenTelemetryAttributes } from "./utils";
 
@@ -17,6 +18,8 @@ export { toDatadogLogFields, toOpenTelemetryAttributes } from "./utils";
 export type {
   DeadlineStrategy,
   ExecutionPlan,
+  ExFlowCustomMappedFields,
+  ExFlowDiagnosticsMapperOptions,
   ExFlowDiagnostics,
   ExFlowExecutionDetails,
   ExFlowFairnessPolicy,

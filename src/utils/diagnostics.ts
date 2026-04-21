@@ -1,6 +1,8 @@
 import ExFlowRuntimeError from "../errors/exFlowRuntimeError";
 import {
+  ExFlowCustomMappedFields,
   ExFlowDatadogLogFields,
+  ExFlowDiagnosticsMapperOptions,
   ExFlowObservabilityEvent,
   ExFlowOpenTelemetryAttributes,
 } from "../types";
@@ -40,59 +42,139 @@ export const serializeExFlowError = (
   };
 };
 
+const normalizeValue = (value: unknown): string | number | boolean | null => {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return value;
+  }
+  return String(value);
+};
+
+/**
+ * Creates a configurable diagnostics field mapper.
+ */
+export const createDiagnosticsMapper = (
+  options: ExFlowDiagnosticsMapperOptions = {},
+): ((event: ExFlowObservabilityEvent) => ExFlowCustomMappedFields) => {
+  const {
+    keyPrefix,
+    separator = ".",
+    fieldNameMap = {},
+    staticFields = {},
+    includeNulls = false,
+    valueTransform,
+  } = options;
+
+  const mapKey = (baseKey: keyof NonNullable<typeof fieldNameMap> | string): string => {
+    const mapped = (fieldNameMap as Record<string, string>)[baseKey] ?? baseKey;
+    return keyPrefix ? `${keyPrefix}${separator}${mapped}` : mapped;
+  };
+
+  const put = (
+    target: ExFlowCustomMappedFields,
+    event: ExFlowObservabilityEvent,
+    key: string,
+    baseKey: string,
+    value: unknown,
+  ): void => {
+    const transformed = valueTransform ? valueTransform(value, baseKey, event) : value;
+    const normalized = normalizeValue(transformed);
+    if (normalized === null && !includeNulls) {
+      return;
+    }
+    target[key] = normalized;
+  };
+
+  return (event: ExFlowObservabilityEvent): ExFlowCustomMappedFields => {
+    const mapped: ExFlowCustomMappedFields = { ...staticFields };
+
+    put(mapped, event, mapKey("source"), "source", event.source);
+    put(mapped, event, mapKey("code"), "code", event.code);
+    put(mapped, event, mapKey("message"), "message", event.message);
+    put(mapped, event, mapKey("name"), "name", event.name);
+    put(mapped, event, mapKey("timestamp"), "timestamp", event.timestamp);
+
+    put(mapped, event, mapKey("cyclePath"), "cyclePath", event.diagnostics?.cyclePath?.join("->"));
+    put(
+      mapped,
+      event,
+      mapKey("unresolvedNodeIds"),
+      "unresolvedNodeIds",
+      event.diagnostics?.unresolvedNodeIds?.join(","),
+    );
+    put(
+      mapped,
+      event,
+      mapKey("invalidOptionField"),
+      "invalidOptionField",
+      event.diagnostics?.invalidOptionField,
+    );
+    put(
+      mapped,
+      event,
+      mapKey("invalidOptionValue"),
+      "invalidOptionValue",
+      event.diagnostics?.invalidOptionValue,
+    );
+    put(mapped, event, mapKey("details"), "details", event.diagnostics?.details);
+
+    return mapped;
+  };
+};
+
 /**
  * Maps an observability payload to OpenTelemetry attributes.
  */
 export const toOpenTelemetryAttributes = (
   event: ExFlowObservabilityEvent,
 ): ExFlowOpenTelemetryAttributes => {
-  const attributes: ExFlowOpenTelemetryAttributes = {
-    "exflow.source": event.source,
-    "exflow.name": event.name,
-    "exflow.message": event.message,
-    "exflow.timestamp": event.timestamp,
-  };
-
-  if (event.code) {
-    attributes["exflow.code"] = event.code;
-  }
-
-  if (event.diagnostics?.cyclePath) {
-    attributes["exflow.cycle_path"] = event.diagnostics.cyclePath.join("->");
-  }
-  if (event.diagnostics?.unresolvedNodeIds) {
-    attributes["exflow.unresolved_nodes"] = event.diagnostics.unresolvedNodeIds.join(",");
-  }
-  if (event.diagnostics?.invalidOptionField) {
-    attributes["exflow.invalid_option_field"] = event.diagnostics.invalidOptionField;
-  }
-  if (event.diagnostics?.invalidOptionValue !== undefined) {
-    attributes["exflow.invalid_option_value"] = String(event.diagnostics.invalidOptionValue);
-  }
-  if (event.diagnostics?.details) {
-    attributes["exflow.details"] = event.diagnostics.details;
-  }
-
-  return attributes;
+  const mapper = createDiagnosticsMapper({
+    keyPrefix: "exflow",
+    separator: ".",
+    fieldNameMap: {
+      cyclePath: "cycle_path",
+      unresolvedNodeIds: "unresolved_nodes",
+      invalidOptionField: "invalid_option_field",
+      invalidOptionValue: "invalid_option_value",
+    },
+    valueTransform: (value, key) => {
+      if (key === "invalidOptionValue" && value !== undefined && value !== null) {
+        return String(value);
+      }
+      return value;
+    },
+  });
+  return mapper(event) as ExFlowOpenTelemetryAttributes;
 };
 
 /**
  * Maps an observability payload to Datadog-style log fields.
  */
-export const toDatadogLogFields = (event: ExFlowObservabilityEvent): ExFlowDatadogLogFields => ({
-  source: event.source,
-  service: "ex-flow",
-  status: "error",
-  error_code: event.code ?? null,
-  error_name: event.name,
-  message: event.message,
-  timestamp: event.timestamp,
-  diagnostics_cycle_path: event.diagnostics?.cyclePath?.join("->") ?? null,
-  diagnostics_unresolved_nodes: event.diagnostics?.unresolvedNodeIds?.join(",") ?? null,
-  diagnostics_invalid_option_field: event.diagnostics?.invalidOptionField ?? null,
-  diagnostics_invalid_option_value:
-    event.diagnostics?.invalidOptionValue !== undefined
-      ? String(event.diagnostics.invalidOptionValue)
-      : null,
-  diagnostics_details: event.diagnostics?.details ?? null,
-});
+export const toDatadogLogFields = (event: ExFlowObservabilityEvent): ExFlowDatadogLogFields => {
+  const mapper = createDiagnosticsMapper({
+    separator: "_",
+    includeNulls: true,
+    fieldNameMap: {
+      code: "error_code",
+      name: "error_name",
+      cyclePath: "diagnostics_cycle_path",
+      unresolvedNodeIds: "diagnostics_unresolved_nodes",
+      invalidOptionField: "diagnostics_invalid_option_field",
+      invalidOptionValue: "diagnostics_invalid_option_value",
+      details: "diagnostics_details",
+    },
+    staticFields: {
+      service: "ex-flow",
+      status: "error",
+    },
+    valueTransform: (value, key) => {
+      if (key === "invalidOptionValue" && value !== undefined && value !== null) {
+        return String(value);
+      }
+      return value;
+    },
+  });
+  return mapper(event) as ExFlowDatadogLogFields;
+};

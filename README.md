@@ -1,4 +1,4 @@
-# ex-flow
+# ex-flow 📊
 
 Priority-aware DAG execution planner for TypeScript based on Kahn's Algorithm.
 
@@ -238,6 +238,41 @@ try {
 
   // Example: logger.error(logFields)
   console.log("worker.log", JSON.stringify(logFields));
+}
+```
+
+### Integration: Custom Mapper Factory
+
+Use `createDiagnosticsMapper` when your team needs custom field names or value transforms.
+
+```ts
+import { createDiagnosticsMapper, serializeExFlowError } from "ex-flow";
+
+const mapDiagnostics = createDiagnosticsMapper({
+  keyPrefix: "scheduler",
+  separator: "_",
+  fieldNameMap: {
+    code: "err_code",
+    message: "err_message",
+    cyclePath: "cycle",
+  },
+  staticFields: {
+    team: "platform",
+  },
+  valueTransform: (value, key) => {
+    if (key === "invalidOptionValue" && value !== undefined && value !== null) {
+      return `value:${String(value)}`;
+    }
+    return value;
+  },
+});
+
+try {
+  // ex-flow logic
+} catch (error) {
+  const event = serializeExFlowError(error);
+  const payload = mapDiagnostics(event);
+  console.log("custom.payload", payload);
 }
 ```
 

@@ -5,7 +5,12 @@ import { createExFlowConfigBuilder } from "../core/configBuilder";
 import { getExFlowPreset } from "../core/presets";
 import ExFlow from "../core/exFlow";
 import ExFlowRuntimeError from "../errors/exFlowRuntimeError";
-import { serializeExFlowError, toDatadogLogFields, toOpenTelemetryAttributes } from "../utils";
+import {
+  createDiagnosticsMapper,
+  serializeExFlowError,
+  toDatadogLogFields,
+  toOpenTelemetryAttributes,
+} from "../utils";
 
 type Task = { name: string };
 
@@ -613,4 +618,64 @@ test("toDatadogLogFields maps diagnostics payload", () => {
     diagnostics_invalid_option_value: "0",
     diagnostics_details: null,
   });
+});
+
+test("createDiagnosticsMapper supports custom naming convention", () => {
+  const event = serializeExFlowError(
+    new ExFlowRuntimeError("EXFLOW_CYCLE_DETECTED", "cycle", {
+      cyclePath: ["A", "B", "A"],
+      details: "loop",
+    }),
+    "2026-04-21T00:00:00.000Z",
+  );
+
+  const mapDiagnostics = createDiagnosticsMapper({
+    keyPrefix: "scheduler",
+    separator: "_",
+    fieldNameMap: {
+      code: "err_code",
+      message: "err_message",
+      cyclePath: "cycle",
+    },
+    staticFields: {
+      team: "platform",
+    },
+  });
+
+  const mapped = mapDiagnostics(event);
+
+  assert.deepEqual(mapped, {
+    team: "platform",
+    scheduler_source: "ex-flow",
+    scheduler_err_code: "EXFLOW_CYCLE_DETECTED",
+    scheduler_err_message: "[EXFLOW_CYCLE_DETECTED] cycle",
+    scheduler_name: "ExFlowRuntimeError",
+    scheduler_timestamp: "2026-04-21T00:00:00.000Z",
+    scheduler_cycle: "A->B->A",
+    scheduler_details: "loop",
+  });
+});
+
+test("createDiagnosticsMapper supports value transform", () => {
+  const event = serializeExFlowError(
+    new ExFlowRuntimeError("EXFLOW_INVALID_OPTION", "bad option", {
+      invalidOptionValue: 0,
+    }),
+    "2026-04-21T00:00:00.000Z",
+  );
+
+  const mapDiagnostics = createDiagnosticsMapper({
+    includeNulls: true,
+    valueTransform: (value, key) => {
+      if (key === "invalidOptionValue" && value !== undefined) {
+        return `value:${String(value)}`;
+      }
+      return value;
+    },
+  });
+
+  const mapped = mapDiagnostics(event);
+
+  assert.equal(mapped.invalidOptionValue, "value:0");
+  assert.equal(mapped.cyclePath, null);
 });
