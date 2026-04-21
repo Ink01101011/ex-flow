@@ -44,6 +44,28 @@ export type DeadlineStrategy = "earliest-first" | "latest-first";
 export type WeightStrategy = "higher-first" | "lower-first";
 export type ExFlowSchedulerMode = "level" | "throughput";
 export type ExFlowTieFallbackPolicy = "insertion" | "id-asc" | "id-desc";
+export type ExFlowFairnessPolicy = "none" | "aging";
+export type ExFlowPresetName = "stable-enterprise" | "high-throughput" | "strict-fairness";
+
+export interface ExFlowDiagnostics {
+  cyclePath?: string[];
+  unresolvedNodeIds?: string[];
+  invalidOptionField?: string;
+  invalidOptionValue?: unknown;
+  details?: string;
+}
+
+export interface ExFlowMetrics {
+  schedulerMode: ExFlowSchedulerMode;
+  rounds: number;
+  emittedNodes: number;
+  deferredNodes: number;
+  maxReadyQueueSize: number;
+  constraintHits: {
+    concurrencyCap: number;
+    resourceCaps: number;
+  };
+}
 
 /**
  * Runtime options for ExFlow.
@@ -96,6 +118,23 @@ export interface ExFlowOptions<T extends object & ExFlowSafeData> {
    * Defaults to `insertion`.
    */
   tieFallbackPolicy?: ExFlowTieFallbackPolicy;
+  /**
+   * Fairness strategy for constrained scheduling rounds.
+   * `aging` prioritizes nodes that have been deferred repeatedly.
+   */
+  fairnessPolicy?: ExFlowFairnessPolicy;
+  /**
+   * Nodes deferred for at least this many rounds receive maximum fairness priority.
+   */
+  maxDeferralRounds?: number;
+  /**
+   * When true, every node.resourceClass must have a corresponding resourceCaps entry.
+   */
+  requireResourceCapForAllClasses?: boolean;
+  /**
+   * Optional named preset for common enterprise scheduling profiles.
+   */
+  presetName?: ExFlowPresetName;
 }
 
 /**
@@ -115,4 +154,9 @@ export type ExFlowResultItem<T extends object & ExFlowSafeData> = Omit<T, "exFlo
 export interface ExecutionPlan<T extends object & ExFlowSafeData> {
   batches: ExFlowResultItem<T>[][];
   fullSequence: ExFlowResultItem<T>[];
+}
+
+export interface ExFlowExecutionDetails<T extends object & ExFlowSafeData> {
+  plan: ExecutionPlan<T>;
+  metrics: ExFlowMetrics;
 }

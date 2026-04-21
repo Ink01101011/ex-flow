@@ -17,6 +17,10 @@ Within each batch, tasks are sorted by priority (higher first).
 - Configurable output cloning strategy: `shallow`, `deep`, or `custom`
 - External tie-breaker support for equal priorities
 - Optional scheduling constraints: concurrency caps, resource caps, deadline and weight strategies
+- Scheduler telemetry via `resolveExecutionDetails()`
+- Structured diagnostics via `ExFlowRuntimeError`
+- Fairness controls (`aging`, `maxDeferralRounds`) for constrained throughput scheduling
+- Preset profiles for enterprise-ready defaults
 
 ## Installation
 
@@ -72,6 +76,10 @@ Options:
 - `weightStrategy?: "higher-first" | "lower-first"`
 - `schedulerMode?: "level" | "throughput"` (default: `level`)
 - `tieFallbackPolicy?: "insertion" | "id-asc" | "id-desc"` (default: `insertion`)
+- `fairnessPolicy?: "none" | "aging"` (default: `none`)
+- `maxDeferralRounds?: number`
+- `requireResourceCapForAllClasses?: boolean`
+- `presetName?: "stable-enterprise" | "high-throughput" | "strict-fairness"`
 
 ### `createExFlowConfigBuilder<T>()`
 
@@ -85,11 +93,15 @@ import { ExFlow, createExFlowConfigBuilder } from "ex-flow";
 type Task = { name: string; meta: { tags: string[] } };
 
 const options = createExFlowConfigBuilder<Task>()
+  .withPreset("high-throughput")
   .withSchedulerMode("throughput")
   .withPriorityAscending(true)
   .withTieFallbackPolicy("id-asc")
+  .withFairnessPolicy("aging")
+  .withMaxDeferralRounds(2)
   .withConcurrencyCap(2)
   .withResourceCaps({ cpu: 1 })
+  .requireResourceCapForAllClasses()
   .withDeadlineStrategy("earliest-first")
   .withWeightStrategy("higher-first")
   .useCustomClone((data) => ({
@@ -103,6 +115,20 @@ const flow = new ExFlow<Task>(options);
 
 `throughput` mode allows newly-ready nodes to be scheduled between constrained sub-batches,
 which can improve total throughput while preserving dependency correctness.
+
+### `resolveExecutionDetails()`
+
+Returns both plan and scheduler metrics:
+
+- `plan`: same shape as `resolveExecutionPlan()`
+- `metrics`:
+  - `schedulerMode`
+  - `rounds`
+  - `emittedNodes`
+  - `deferredNodes`
+  - `maxReadyQueueSize`
+  - `constraintHits.concurrencyCap`
+  - `constraintHits.resourceCaps`
 
 ### `addEntity(node)`
 
@@ -122,6 +148,8 @@ Builds the execution plan.
 - Throws `[EXFLOW_CYCLE_DETECTED]` when the graph has a cycle.
 
 Cycle errors now include a detected cycle path in the message when available.
+
+Structured diagnostics are available through `ExFlowRuntimeError.diagnostics`.
 
 Returns:
 
@@ -174,6 +202,46 @@ Exported as `EXFLOW_ERROR`:
 - `EXFLOW_CUSTOM_CLONE_FN_REQUIRED`
 - `EXFLOW_DEEP_CLONE_UNAVAILABLE`
 - `EXFLOW_INVALID_OPTION`
+
+## Compatibility Matrix
+
+Ordering determinism and scheduling behavior by mode:
+
+| Mode         | Ready-node release                 | Tie fallback default | Throughput profile            |
+| ------------ | ---------------------------------- | -------------------- | ----------------------------- |
+| `level`      | strict level-by-level              | insertion order      | predictable phase boundaries  |
+| `throughput` | unlocks between constrained rounds | insertion order      | higher utilization under caps |
+
+Tie resolution priority chain:
+
+1. `priorityAscending` / priority value
+2. `deadlineStrategy` (if set)
+3. `weightStrategy` (if set)
+4. `tieBreaker` (if set)
+5. `tieFallbackPolicy`
+
+## Migration Notes
+
+Suggested upgrade path for existing consumers:
+
+1. Preserve old behavior:
+
+- keep `schedulerMode: "level"`
+- keep `tieFallbackPolicy: "insertion"`
+
+2. Adopt deterministic id-based fallback (optional):
+
+- set `tieFallbackPolicy: "id-asc"`
+
+3. Adopt throughput mode safely:
+
+- start with `schedulerMode: "throughput"`
+- add `concurrencyCap` and `resourceCaps`
+- consider `fairnessPolicy: "aging"` + `maxDeferralRounds`
+
+4. Enforce resource governance in production:
+
+- enable `requireResourceCapForAllClasses: true`
 
 ## License
 

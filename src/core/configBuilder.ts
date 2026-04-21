@@ -1,6 +1,7 @@
 import { EXFLOW_ERROR } from "../constants";
 import { ExFlowOptions, ExFlowSafeData } from "../types";
 import { formatExFlowError } from "../utils";
+import { getExFlowPreset } from "./presets";
 
 /**
  * Fluent builder for ExFlow runtime options.
@@ -83,6 +84,30 @@ class ExFlowConfigBuilder<T extends object & ExFlowSafeData> {
     return this;
   }
 
+  withFairnessPolicy(fairnessPolicy: NonNullable<ExFlowOptions<T>["fairnessPolicy"]>): this {
+    this.options = {
+      ...this.options,
+      fairnessPolicy,
+    };
+    return this;
+  }
+
+  withMaxDeferralRounds(maxDeferralRounds: number): this {
+    this.options = {
+      ...this.options,
+      maxDeferralRounds,
+    };
+    return this;
+  }
+
+  requireResourceCapForAllClasses(requireResourceCapForAllClasses = true): this {
+    this.options = {
+      ...this.options,
+      requireResourceCapForAllClasses,
+    };
+    return this;
+  }
+
   withSchedulerMode(schedulerMode: NonNullable<ExFlowOptions<T>["schedulerMode"]>): this {
     this.options = {
       ...this.options,
@@ -97,6 +122,15 @@ class ExFlowConfigBuilder<T extends object & ExFlowSafeData> {
     this.options = {
       ...this.options,
       tieFallbackPolicy,
+    };
+    return this;
+  }
+
+  withPreset(presetName: NonNullable<ExFlowOptions<T>["presetName"]>): this {
+    this.options = {
+      ...this.options,
+      ...getExFlowPreset<T>(presetName),
+      presetName,
     };
     return this;
   }

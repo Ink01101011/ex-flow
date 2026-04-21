@@ -26,3 +26,19 @@ Before first publish:
 1. Ensure package name/version are correct in `package.json`
 2. Create npm token and set `NPM_TOKEN` in GitHub repository secrets
 3. Create a GitHub Release to trigger publish workflow
+
+## Release Hardening Checklist
+
+Before each consumer-facing release:
+
+1. Run compatibility checks:
+   - Validate ordering expectations in both `level` and `throughput` modes.
+   - Confirm `tieFallbackPolicy` migration impact in release notes.
+2. Run diagnostics checks:
+   - Verify cycle errors include `diagnostics.cyclePath` and unresolved nodes.
+   - Verify invalid option errors include structured diagnostics fields.
+3. Run throughput benchmark:
+   - Execute `pnpm run bench`.
+   - Record round count and deferred node trends for regressions.
+4. Validate fairness behavior:
+   - Ensure aging + max deferral scenarios are covered by tests.

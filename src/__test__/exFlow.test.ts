@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { createExFlowConfigBuilder } from "../core/configBuilder";
+import { getExFlowPreset } from "../core/presets";
 import ExFlow from "../core/exFlow";
+import ExFlowRuntimeError from "../errors/exFlowRuntimeError";
 
 type Task = { name: string };
 
@@ -368,4 +370,159 @@ test("config builder sets scheduler mode and tie fallback policy", () => {
     schedulerMode: "throughput",
     tieFallbackPolicy: "id-asc",
   });
+});
+
+test("resolveExecutionDetails returns metrics", () => {
+  const flow = new ExFlow<Task>({ schedulerMode: "throughput", concurrencyCap: 1 });
+
+  flow.addEntity({ id: "A", dependsOn: [], data: { name: "Task A" }, priority: 2 });
+  flow.addEntity({ id: "B", dependsOn: [], data: { name: "Task B" }, priority: 1 });
+
+  const details = flow.resolveExecutionDetails();
+
+  assert.equal(details.plan.fullSequence.length, 2);
+  assert.equal(details.metrics.schedulerMode, "throughput");
+  assert.equal(details.metrics.emittedNodes, 2);
+  assert.equal(details.metrics.rounds, 2);
+  assert.equal(details.metrics.maxReadyQueueSize, 2);
+});
+
+test("structured diagnostics expose cycle path and unresolved nodes", () => {
+  const flow = new ExFlow<Task>();
+
+  flow.addEntity({ id: "A", dependsOn: ["B"], data: { name: "Task A" } });
+  flow.addEntity({ id: "B", dependsOn: ["A"], data: { name: "Task B" } });
+
+  try {
+    flow.resolveExecutionPlan();
+    assert.fail("expected cycle error");
+  } catch (error) {
+    assert.equal(error instanceof ExFlowRuntimeError, true);
+    const exError = error as ExFlowRuntimeError;
+    assert.equal(exError.code, "EXFLOW_CYCLE_DETECTED");
+    assert.deepEqual(exError.diagnostics?.cyclePath, ["A", "B", "A"]);
+    assert.deepEqual(exError.diagnostics?.unresolvedNodeIds?.sort(), ["A", "B"]);
+  }
+});
+
+test("preflight resource cap validation catches missing class cap", () => {
+  const flow = new ExFlow<Task>({
+    requireResourceCapForAllClasses: true,
+    resourceCaps: { io: 1 },
+  });
+
+  flow.addEntity({
+    id: "A",
+    dependsOn: [],
+    data: { name: "Task A" },
+    resourceClass: "cpu",
+  });
+
+  assert.throws(() => flow.resolveExecutionPlan(), /\[EXFLOW_INVALID_OPTION\]/);
+});
+
+test("fairness aging with maxDeferralRounds prevents starvation", () => {
+  const flow = new ExFlow<Task>({
+    schedulerMode: "throughput",
+    concurrencyCap: 1,
+    fairnessPolicy: "aging",
+    maxDeferralRounds: 1,
+  });
+
+  flow.addEntity({ id: "A", dependsOn: [], data: { name: "Task A" }, priority: 10 });
+  flow.addEntity({ id: "B", dependsOn: [], data: { name: "Task B" }, priority: 1 });
+  flow.addEntity({ id: "C", dependsOn: ["A"], data: { name: "Task C" }, priority: 10 });
+
+  const plan = flow.resolveExecutionPlan();
+
+  assert.deepEqual(
+    plan.fullSequence.map((item) => item.name),
+    ["Task A", "Task B", "Task C"],
+  );
+});
+
+test("preset helper returns expected defaults", () => {
+  const preset = getExFlowPreset("high-throughput");
+
+  assert.equal(preset.schedulerMode, "throughput");
+  assert.equal(preset.fairnessPolicy, "aging");
+});
+
+test("config builder applies preset", () => {
+  const options = createExFlowConfigBuilder<{ name: string }>()
+    .withPreset("strict-fairness")
+    .build();
+
+  assert.equal(options.schedulerMode, "throughput");
+  assert.equal(options.fairnessPolicy, "aging");
+  assert.equal(options.maxDeferralRounds, 1);
+});
+
+test("property: random DAG always respects topological order and deterministic output", () => {
+  const createSeededRandom = (seed: number): (() => number) => {
+    let current = seed;
+    return () => {
+      current = (current * 1664525 + 1013904223) % 4294967296;
+      return current / 4294967296;
+    };
+  };
+
+  for (let iteration = 0; iteration < 40; iteration += 1) {
+    const nodeCount = 12;
+    const nodeIds = Array.from({ length: nodeCount }, (_, idx) => `N${idx}`);
+
+    const buildFlow = (seedOffset: number) => {
+      const random = createSeededRandom(1000 + iteration + seedOffset);
+      const flow = new ExFlow<{ name: string }>({
+        schedulerMode: "throughput",
+        concurrencyCap: 3,
+        tieFallbackPolicy: "id-asc",
+      });
+      const edges: Array<{ id: string; dependsOn: string[] }> = [];
+
+      for (let idx = 0; idx < nodeCount; idx += 1) {
+        const id = nodeIds[idx];
+        const dependsOn: string[] = [];
+
+        for (let depIdx = 0; depIdx < idx; depIdx += 1) {
+          if (random() < 0.18) {
+            dependsOn.push(nodeIds[depIdx]);
+          }
+        }
+
+        flow.addEntity({
+          id,
+          dependsOn,
+          data: { name: id },
+          priority: Math.floor(random() * 4),
+        });
+        edges.push({ id, dependsOn });
+      }
+
+      return { flow, edges };
+    };
+
+    const case1 = buildFlow(0);
+    const case2 = buildFlow(0);
+    const flow1 = case1.flow;
+    const flow2 = case2.flow;
+    const plan1 = flow1.resolveExecutionPlan();
+    const plan2 = flow2.resolveExecutionPlan();
+    const order1 = plan1.fullSequence.map((item) => item.name);
+    const order2 = plan2.fullSequence.map((item) => item.name);
+
+    assert.deepEqual(order1, order2);
+
+    const indexById = new Map(order1.map((id, idx) => [id, idx]));
+    for (const edge of case1.edges) {
+      for (const depId of edge.dependsOn) {
+        const position = indexById.get(edge.id);
+        const depPosition = indexById.get(depId);
+        if (position === undefined || depPosition === undefined) {
+          continue;
+        }
+        assert.equal(depPosition <= position, true);
+      }
+    }
+  }
 });
