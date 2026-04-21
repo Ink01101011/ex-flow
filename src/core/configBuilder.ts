@@ -9,19 +9,36 @@ class ExFlowConfigBuilder<T extends object & ExFlowSafeData> {
   private options: ExFlowOptions<T> = {};
 
   useShallowClone(): this {
-    this.options = { cloneMode: "shallow" };
+    const { cloneFn: _cloneFn, ...rest } = this.options;
+    this.options = {
+      ...rest,
+      cloneMode: "shallow",
+    };
     return this;
   }
 
   useDeepClone(): this {
-    this.options = { cloneMode: "deep" };
+    const { cloneFn: _cloneFn, ...rest } = this.options;
+    this.options = {
+      ...rest,
+      cloneMode: "deep",
+    };
     return this;
   }
 
   useCustomClone(cloneFn: (data: T) => T): this {
     this.options = {
+      ...this.options,
       cloneMode: "custom",
       cloneFn,
+    };
+    return this;
+  }
+
+  withPriorityAscending(priorityAscending: boolean): this {
+    this.options = {
+      ...this.options,
+      priorityAscending,
     };
     return this;
   }

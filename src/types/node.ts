@@ -44,6 +44,12 @@ export interface ExFlowOptions<T extends object & ExFlowSafeData> {
    * Custom clone function used only when cloneMode is `custom`.
    */
   cloneFn?: (data: T) => T;
+
+  /**
+   * If true, nodes with lower priority values are executed first.
+   * Defaults to `false` (higher priority first).
+   */
+  priorityAscending?: boolean;
 }
 
 /**

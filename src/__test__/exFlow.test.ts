@@ -22,6 +22,36 @@ test("resolves DAG into priority-sorted batches", () => {
   );
 });
 
+test("resolves DAG with ascending priority when priorityAscending=true", () => {
+  const flow = new ExFlow<Task>({ priorityAscending: true });
+
+  flow.addEntity({ id: "A", dependsOn: [], data: { name: "Task A" }, priority: 2 });
+  flow.addEntity({ id: "B", dependsOn: ["A"], data: { name: "Task B" }, priority: 1 });
+  flow.addEntity({ id: "C", dependsOn: ["A"], data: { name: "Task C" }, priority: 3 });
+
+  const plan = flow.resolveExecutionPlan();
+
+  assert.deepEqual(
+    plan.fullSequence.map((item) => item.name),
+    ["Task A", "Task B", "Task C"],
+  );
+});
+
+test("resolves DAG with descending priority when priorityAscending=false", () => {
+  const flow = new ExFlow<Task>({ priorityAscending: false });
+
+  flow.addEntity({ id: "A", dependsOn: [], data: { name: "Task A" }, priority: 2 });
+  flow.addEntity({ id: "B", dependsOn: ["A"], data: { name: "Task B" }, priority: 1 });
+  flow.addEntity({ id: "C", dependsOn: ["A"], data: { name: "Task C" }, priority: 3 });
+
+  const plan = flow.resolveExecutionPlan();
+
+  assert.deepEqual(
+    plan.fullSequence.map((item) => item.name),
+    ["Task A", "Task C", "Task B"],
+  );
+});
+
 test("throws duplicate node error code", () => {
   const flow = new ExFlow<Task>();
 
@@ -152,4 +182,10 @@ test("config builder creates custom clone options", () => {
 
   assert.equal(options.cloneMode, "custom");
   assert.equal(typeof options.cloneFn, "function");
+});
+
+test("config builder sets priorityAscending option", () => {
+  const options = createExFlowConfigBuilder<{ name: string }>().withPriorityAscending(true).build();
+
+  assert.deepEqual(options, { priorityAscending: true });
 });

@@ -114,7 +114,10 @@ class ExFlow<T extends object & ExFlowSafeData> {
         }
       }
 
-      const sortedBatch = radixSort(currentBatch, (a) => a.exFlowPriority).reverse();
+      let sortedBatch = radixSort(currentBatch, (a) => a.exFlowPriority);
+      if (this.options.priorityAscending !== true) {
+        sortedBatch = sortedBatch.reverse();
+      }
 
       batches.push(sortedBatch);
       fullSequence.push(...sortedBatch);

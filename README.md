@@ -62,6 +62,7 @@ Options:
 
 - `cloneMode?: "shallow" | "deep" | "custom"`
 - `cloneFn?: (data: T) => T` (required when `cloneMode` is `custom`)
+- `priorityAscending?: boolean` (default: `false`, so higher priority runs first)
 
 ### `createExFlowConfigBuilder<T>()`
 
@@ -75,6 +76,7 @@ import { ExFlow, createExFlowConfigBuilder } from "ex-flow";
 type Task = { name: string; meta: { tags: string[] } };
 
 const options = createExFlowConfigBuilder<Task>()
+  .withPriorityAscending(true)
   .useCustomClone((data) => ({
     ...data,
     meta: { ...data.meta, tags: [...data.meta.tags] },
