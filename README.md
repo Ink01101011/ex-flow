@@ -70,6 +70,8 @@ Options:
 - `resourceCaps?: Record<string, number>`
 - `deadlineStrategy?: "earliest-first" | "latest-first"`
 - `weightStrategy?: "higher-first" | "lower-first"`
+- `schedulerMode?: "level" | "throughput"` (default: `level`)
+- `tieFallbackPolicy?: "insertion" | "id-asc" | "id-desc"` (default: `insertion`)
 
 ### `createExFlowConfigBuilder<T>()`
 
@@ -83,7 +85,9 @@ import { ExFlow, createExFlowConfigBuilder } from "ex-flow";
 type Task = { name: string; meta: { tags: string[] } };
 
 const options = createExFlowConfigBuilder<Task>()
+  .withSchedulerMode("throughput")
   .withPriorityAscending(true)
+  .withTieFallbackPolicy("id-asc")
   .withConcurrencyCap(2)
   .withResourceCaps({ cpu: 1 })
   .withDeadlineStrategy("earliest-first")
@@ -96,6 +100,9 @@ const options = createExFlowConfigBuilder<Task>()
 
 const flow = new ExFlow<Task>(options);
 ```
+
+`throughput` mode allows newly-ready nodes to be scheduled between constrained sub-batches,
+which can improve total throughput while preserving dependency correctness.
 
 ### `addEntity(node)`
 

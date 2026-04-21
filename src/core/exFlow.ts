@@ -7,7 +7,6 @@ import { formatExFlowError } from "../utils";
 
 type PlannedNode<T extends object & ExFlowSafeData> = {
   id: string;
-  data: T;
   exFlowPriority: number;
   resourceClass?: string;
   deadline?: number;
@@ -95,6 +94,10 @@ class ExFlow<T extends object & ExFlowSafeData> {
   ): ExecutionPlan<T> {
     this.validateOptions();
 
+    if (this.options.schedulerMode === "throughput") {
+      return this.calculateThroughputPlan(inDegree, adjacencyList);
+    }
+
     const batches: ExFlowResultItem<T>[][] = [];
     const fullSequence: ExFlowResultItem<T>[] = [];
     let queue: string[] = [];
@@ -112,7 +115,6 @@ class ExFlow<T extends object & ExFlowSafeData> {
         if (node) {
           const plannedNode: PlannedNode<T> = {
             id,
-            data: this.cloneData(node.data),
             exFlowPriority: node.priority ?? 0,
             resourceClass: node.resourceClass,
             deadline: node.deadline,
@@ -160,6 +162,75 @@ class ExFlow<T extends object & ExFlowSafeData> {
     return { batches, fullSequence };
   }
 
+  private calculateThroughputPlan(
+    inDegree: Map<string, number>,
+    adjacencyList: Map<string, string[]>,
+  ): ExecutionPlan<T> {
+    const batches: ExFlowResultItem<T>[][] = [];
+    const fullSequence: ExFlowResultItem<T>[] = [];
+    const readyNodeIds: Set<string> = new Set();
+
+    inDegree.forEach((degree, id) => {
+      if (degree === 0) {
+        readyNodeIds.add(id);
+      }
+    });
+
+    while (readyNodeIds.size > 0) {
+      const candidates: PlannedNode<T>[] = [];
+      for (const id of readyNodeIds) {
+        const node = this.nodes.get(id);
+        if (!node) {
+          continue;
+        }
+
+        candidates.push({
+          id,
+          exFlowPriority: node.priority ?? 0,
+          resourceClass: node.resourceClass,
+          deadline: node.deadline,
+          weight: node.weight,
+          sourceNode: node,
+        });
+      }
+
+      const sortedCandidates = this.sortBatch(candidates);
+      const nextBatchNodes = this.selectConstrainedBatch(sortedCandidates);
+      const resultBatch = nextBatchNodes.map((plannedNode) => this.toResultItem(plannedNode));
+
+      batches.push(resultBatch);
+      fullSequence.push(...resultBatch);
+
+      for (const plannedNode of nextBatchNodes) {
+        readyNodeIds.delete(plannedNode.id);
+        const neighbors = adjacencyList.get(plannedNode.id) || [];
+        for (const neighborId of neighbors) {
+          const degree = inDegree.get(neighborId);
+          if (degree === undefined) {
+            continue;
+          }
+
+          const nextDegree = degree - 1;
+          inDegree.set(neighborId, nextDegree);
+          if (nextDegree === 0) {
+            readyNodeIds.add(neighborId);
+          }
+        }
+      }
+    }
+
+    if (fullSequence.length !== this.nodes.size) {
+      const cyclePath = this.findCyclePath(inDegree, adjacencyList);
+      const cycleMessage =
+        cyclePath.length > 0
+          ? `Cycle detected in the graph: ${cyclePath.join(" -> ")}.`
+          : "Cycle detected in the graph.";
+      throw new Error(formatExFlowError(EXFLOW_ERROR.CYCLE_DETECTED, cycleMessage));
+    }
+
+    return { batches, fullSequence };
+  }
+
   private validateOptions(): void {
     const concurrencyCap = this.options.concurrencyCap;
     if (
@@ -193,7 +264,9 @@ class ExFlow<T extends object & ExFlowSafeData> {
     const requiresCompareSort =
       typeof this.options.tieBreaker === "function" ||
       this.options.deadlineStrategy !== undefined ||
-      this.options.weightStrategy !== undefined;
+      this.options.weightStrategy !== undefined ||
+      (this.options.tieFallbackPolicy !== undefined &&
+        this.options.tieFallbackPolicy !== "insertion");
 
     if (!requiresCompareSort) {
       let sortedBatch = radixSort(batch, (item) => item.exFlowPriority);
@@ -232,7 +305,20 @@ class ExFlow<T extends object & ExFlowSafeData> {
       }
     }
 
-    return this.getNodeOrder(a.id) - this.getNodeOrder(b.id);
+    return this.compareByTieFallbackPolicy(a.id, b.id);
+  }
+
+  private compareByTieFallbackPolicy(aId: string, bId: string): number {
+    const policy = this.options.tieFallbackPolicy ?? "insertion";
+
+    if (policy === "id-asc") {
+      return aId.localeCompare(bId);
+    }
+    if (policy === "id-desc") {
+      return bId.localeCompare(aId);
+    }
+
+    return this.getNodeOrder(aId) - this.getNodeOrder(bId);
   }
 
   private compareByDeadline(a: PlannedNode<T>, b: PlannedNode<T>): number {
@@ -289,36 +375,12 @@ class ExFlow<T extends object & ExFlowSafeData> {
     const constrainedBatches: PlannedNode<T>[][] = [];
 
     while (remaining.length > 0) {
-      const nextBatch: PlannedNode<T>[] = [];
-      const resourceUsage: Record<string, number> = {};
+      const nextBatch = this.selectConstrainedBatch(remaining, maxPerBatch, resourceCaps);
+      const selectedIds = new Set(nextBatch.map((item) => item.id));
+      const nextRemaining = remaining.filter((item) => !selectedIds.has(item.id));
 
-      for (let index = 0; index < remaining.length; index += 1) {
-        if (nextBatch.length >= maxPerBatch) {
-          break;
-        }
-
-        const candidate = remaining[index];
-        if (!this.canUseResource(candidate, resourceUsage, resourceCaps)) {
-          continue;
-        }
-
-        nextBatch.push(candidate);
-        if (candidate.resourceClass !== undefined) {
-          resourceUsage[candidate.resourceClass] =
-            (resourceUsage[candidate.resourceClass] ?? 0) + 1;
-        }
-        remaining.splice(index, 1);
-        index -= 1;
-      }
-
-      if (nextBatch.length === 0) {
-        throw new Error(
-          formatExFlowError(
-            EXFLOW_ERROR.INVALID_OPTION,
-            "resourceCaps configuration prevents scheduling nodes in any batch.",
-          ),
-        );
-      }
+      remaining.length = 0;
+      remaining.push(...nextRemaining);
 
       constrainedBatches.push(nextBatch);
     }
@@ -343,9 +405,45 @@ class ExFlow<T extends object & ExFlowSafeData> {
     return (usage[node.resourceClass] ?? 0) < cap;
   }
 
+  private selectConstrainedBatch(
+    sortedNodes: PlannedNode<T>[],
+    maxPerBatch = this.options.concurrencyCap ?? Number.POSITIVE_INFINITY,
+    resourceCaps = this.options.resourceCaps,
+  ): PlannedNode<T>[] {
+    const nextBatch: PlannedNode<T>[] = [];
+    const resourceUsage: Record<string, number> = {};
+
+    for (let index = 0; index < sortedNodes.length; index += 1) {
+      if (nextBatch.length >= maxPerBatch) {
+        break;
+      }
+
+      const candidate = sortedNodes[index];
+      if (!this.canUseResource(candidate, resourceUsage, resourceCaps)) {
+        continue;
+      }
+
+      nextBatch.push(candidate);
+      if (candidate.resourceClass !== undefined) {
+        resourceUsage[candidate.resourceClass] = (resourceUsage[candidate.resourceClass] ?? 0) + 1;
+      }
+    }
+
+    if (nextBatch.length === 0 && sortedNodes.length > 0) {
+      throw new Error(
+        formatExFlowError(
+          EXFLOW_ERROR.INVALID_OPTION,
+          "resourceCaps configuration prevents scheduling nodes in any batch.",
+        ),
+      );
+    }
+
+    return nextBatch;
+  }
+
   private toResultItem(node: PlannedNode<T>): ExFlowResultItem<T> {
     return {
-      ...(node.data as Omit<T, "exFlowPriority">),
+      ...(this.cloneData(node.sourceNode.data) as Omit<T, "exFlowPriority">),
       exFlowPriority: node.exFlowPriority,
     };
   }

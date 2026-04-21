@@ -42,6 +42,8 @@ export type ExFlowTieBreaker<T extends object & ExFlowSafeData> = (
 ) => number;
 export type DeadlineStrategy = "earliest-first" | "latest-first";
 export type WeightStrategy = "higher-first" | "lower-first";
+export type ExFlowSchedulerMode = "level" | "throughput";
+export type ExFlowTieFallbackPolicy = "insertion" | "id-asc" | "id-desc";
 
 /**
  * Runtime options for ExFlow.
@@ -83,6 +85,17 @@ export interface ExFlowOptions<T extends object & ExFlowSafeData> {
    * Optional strategy for ordering by node weight.
    */
   weightStrategy?: WeightStrategy;
+  /**
+   * Scheduler mode:
+   * - `level` keeps strict level-by-level release.
+   * - `throughput` can unlock and schedule newly-ready nodes between constrained sub-batches.
+   */
+  schedulerMode?: ExFlowSchedulerMode;
+  /**
+   * Fallback deterministic tie policy when priority/deadline/weight/tieBreaker are equal.
+   * Defaults to `insertion`.
+   */
+  tieFallbackPolicy?: ExFlowTieFallbackPolicy;
 }
 
 /**

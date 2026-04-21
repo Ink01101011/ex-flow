@@ -83,6 +83,24 @@ class ExFlowConfigBuilder<T extends object & ExFlowSafeData> {
     return this;
   }
 
+  withSchedulerMode(schedulerMode: NonNullable<ExFlowOptions<T>["schedulerMode"]>): this {
+    this.options = {
+      ...this.options,
+      schedulerMode,
+    };
+    return this;
+  }
+
+  withTieFallbackPolicy(
+    tieFallbackPolicy: NonNullable<ExFlowOptions<T>["tieFallbackPolicy"]>,
+  ): this {
+    this.options = {
+      ...this.options,
+      tieFallbackPolicy,
+    };
+    return this;
+  }
+
   build(): ExFlowOptions<T> {
     if (this.options.cloneMode === "custom" && !this.options.cloneFn) {
       throw new Error(

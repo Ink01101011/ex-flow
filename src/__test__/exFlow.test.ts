@@ -68,6 +68,39 @@ test("applies custom tie-breaker when priorities are equal", () => {
   );
 });
 
+test("applies tie fallback policy id-asc when priorities are equal", () => {
+  const flow = new ExFlow<Task>({ tieFallbackPolicy: "id-asc" });
+
+  flow.addEntity({ id: "B", dependsOn: [], data: { name: "Task B" }, priority: 1 });
+  flow.addEntity({ id: "A", dependsOn: [], data: { name: "Task A" }, priority: 1 });
+
+  const plan = flow.resolveExecutionPlan();
+
+  assert.deepEqual(
+    plan.fullSequence.map((item) => item.name),
+    ["Task A", "Task B"],
+  );
+});
+
+test("throughput mode unlocks nodes between constrained sub-batches", () => {
+  const flow = new ExFlow<Task>({
+    schedulerMode: "throughput",
+    concurrencyCap: 1,
+  });
+
+  flow.addEntity({ id: "A", dependsOn: [], data: { name: "Task A" }, priority: 2 });
+  flow.addEntity({ id: "B", dependsOn: [], data: { name: "Task B" }, priority: 1 });
+  flow.addEntity({ id: "C", dependsOn: ["A"], data: { name: "Task C" }, priority: 100 });
+  flow.addEntity({ id: "D", dependsOn: ["B"], data: { name: "Task D" }, priority: 50 });
+
+  const plan = flow.resolveExecutionPlan();
+
+  assert.deepEqual(
+    plan.fullSequence.map((item) => item.name),
+    ["Task A", "Task C", "Task B", "Task D"],
+  );
+});
+
 test("splits level by concurrency cap", () => {
   const flow = new ExFlow<Task>({ concurrencyCap: 2 });
 
@@ -322,5 +355,17 @@ test("config builder sets scheduling constraints", () => {
     resourceCaps: { cpu: 1 },
     deadlineStrategy: "earliest-first",
     weightStrategy: "higher-first",
+  });
+});
+
+test("config builder sets scheduler mode and tie fallback policy", () => {
+  const options = createExFlowConfigBuilder<{ name: string }>()
+    .withSchedulerMode("throughput")
+    .withTieFallbackPolicy("id-asc")
+    .build();
+
+  assert.deepEqual(options, {
+    schedulerMode: "throughput",
+    tieFallbackPolicy: "id-asc",
   });
 });

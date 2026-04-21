@@ -6,6 +6,8 @@ export type {
   ExecutionPlan,
   ExFlowCloneMode,
   ExFlowOptions,
+  ExFlowSchedulerMode,
+  ExFlowTieFallbackPolicy,
   ExFlowResultItem,
   ExFlowTieBreaker,
   SafeTask,
