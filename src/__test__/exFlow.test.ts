@@ -52,6 +52,116 @@ test("resolves DAG with descending priority when priorityAscending=false", () =>
   );
 });
 
+test("applies custom tie-breaker when priorities are equal", () => {
+  const flow = new ExFlow<Task>({
+    tieBreaker: (a, b) => a.data.name.localeCompare(b.data.name),
+  });
+
+  flow.addEntity({ id: "B", dependsOn: [], data: { name: "Task B" }, priority: 1 });
+  flow.addEntity({ id: "A", dependsOn: [], data: { name: "Task A" }, priority: 1 });
+
+  const plan = flow.resolveExecutionPlan();
+
+  assert.deepEqual(
+    plan.fullSequence.map((item) => item.name),
+    ["Task A", "Task B"],
+  );
+});
+
+test("splits level by concurrency cap", () => {
+  const flow = new ExFlow<Task>({ concurrencyCap: 2 });
+
+  flow.addEntity({ id: "A", dependsOn: [], data: { name: "Task A" }, priority: 3 });
+  flow.addEntity({ id: "B", dependsOn: [], data: { name: "Task B" }, priority: 2 });
+  flow.addEntity({ id: "C", dependsOn: [], data: { name: "Task C" }, priority: 1 });
+
+  const plan = flow.resolveExecutionPlan();
+
+  assert.equal(plan.batches.length, 2);
+  assert.deepEqual(
+    plan.batches.map((batch) => batch.length),
+    [2, 1],
+  );
+  assert.deepEqual(
+    plan.fullSequence.map((item) => item.name),
+    ["Task A", "Task B", "Task C"],
+  );
+});
+
+test("splits level by resource caps", () => {
+  const flow = new ExFlow<Task>({ resourceCaps: { cpu: 1 } });
+
+  flow.addEntity({
+    id: "A",
+    dependsOn: [],
+    data: { name: "Task A" },
+    priority: 2,
+    resourceClass: "cpu",
+  });
+  flow.addEntity({
+    id: "B",
+    dependsOn: [],
+    data: { name: "Task B" },
+    priority: 1,
+    resourceClass: "cpu",
+  });
+
+  const plan = flow.resolveExecutionPlan();
+
+  assert.equal(plan.batches.length, 2);
+  assert.deepEqual(
+    plan.batches.map((batch) => batch.length),
+    [1, 1],
+  );
+});
+
+test("orders equal priority nodes by deadline then weight strategy", () => {
+  const flow = new ExFlow<Task>({
+    deadlineStrategy: "earliest-first",
+    weightStrategy: "higher-first",
+  });
+
+  flow.addEntity({
+    id: "A",
+    dependsOn: [],
+    data: { name: "Task A" },
+    priority: 1,
+    deadline: 10,
+    weight: 1,
+  });
+  flow.addEntity({
+    id: "B",
+    dependsOn: [],
+    data: { name: "Task B" },
+    priority: 1,
+    deadline: 5,
+    weight: 1,
+  });
+  flow.addEntity({
+    id: "C",
+    dependsOn: [],
+    data: { name: "Task C" },
+    priority: 1,
+    deadline: 5,
+    weight: 3,
+  });
+
+  const plan = flow.resolveExecutionPlan();
+
+  assert.deepEqual(
+    plan.fullSequence.map((item) => item.name),
+    ["Task C", "Task B", "Task A"],
+  );
+});
+
+test("throws invalid option error code for invalid concurrencyCap", () => {
+  const flow = new ExFlow<Task>({ concurrencyCap: 0 });
+
+  flow.addEntity({ id: "A", dependsOn: [], data: { name: "Task A" }, priority: 1 });
+
+  assert.throws(() => flow.resolveExecutionPlan(), /\[EXFLOW_INVALID_OPTION\]/);
+});
+
 test("throws duplicate node error code", () => {
   const flow = new ExFlow<Task>();
 
@@ -97,6 +207,15 @@ test("throws cycle error code for real cycles", () => {
   flow.addEntity({ id: "B", dependsOn: ["A"], data: { name: "Task B" } });
 
   assert.throws(() => flow.resolveExecutionPlan(), /\[EXFLOW_CYCLE_DETECTED\]/);
+});
+
+test("cycle diagnostics includes cycle path", () => {
+  const flow = new ExFlow<Task>();
+
+  flow.addEntity({ id: "A", dependsOn: ["B"], data: { name: "Task A" } });
+  flow.addEntity({ id: "B", dependsOn: ["A"], data: { name: "Task B" } });
+
+  assert.throws(() => flow.resolveExecutionPlan(), /Cycle detected in the graph: .*->.*/);
 });
 
 test("default shallow clone keeps nested references", () => {
@@ -188,4 +307,20 @@ test("config builder sets priorityAscending option", () => {
   const options = createExFlowConfigBuilder<{ name: string }>().withPriorityAscending(true).build();
 
   assert.deepEqual(options, { priorityAscending: true });
+});
+
+test("config builder sets scheduling constraints", () => {
+  const options = createExFlowConfigBuilder<{ name: string }>()
+    .withConcurrencyCap(2)
+    .withResourceCaps({ cpu: 1 })
+    .withDeadlineStrategy("earliest-first")
+    .withWeightStrategy("higher-first")
+    .build();
+
+  assert.deepEqual(options, {
+    concurrencyCap: 2,
+    resourceCaps: { cpu: 1 },
+    deadlineStrategy: "earliest-first",
+    weightStrategy: "higher-first",
+  });
 });

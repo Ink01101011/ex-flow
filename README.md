@@ -15,6 +15,8 @@ Within each batch, tasks are sorted by priority (higher first).
 - Priority-aware ordering inside each batch
 - Explicit error codes for common graph/config issues
 - Configurable output cloning strategy: `shallow`, `deep`, or `custom`
+- External tie-breaker support for equal priorities
+- Optional scheduling constraints: concurrency caps, resource caps, deadline and weight strategies
 
 ## Installation
 
@@ -63,6 +65,11 @@ Options:
 - `cloneMode?: "shallow" | "deep" | "custom"`
 - `cloneFn?: (data: T) => T` (required when `cloneMode` is `custom`)
 - `priorityAscending?: boolean` (default: `false`, so higher priority runs first)
+- `tieBreaker?: (a, b) => number` (used when priority values are equal)
+- `concurrencyCap?: number`
+- `resourceCaps?: Record<string, number>`
+- `deadlineStrategy?: "earliest-first" | "latest-first"`
+- `weightStrategy?: "higher-first" | "lower-first"`
 
 ### `createExFlowConfigBuilder<T>()`
 
@@ -77,6 +84,10 @@ type Task = { name: string; meta: { tags: string[] } };
 
 const options = createExFlowConfigBuilder<Task>()
   .withPriorityAscending(true)
+  .withConcurrencyCap(2)
+  .withResourceCaps({ cpu: 1 })
+  .withDeadlineStrategy("earliest-first")
+  .withWeightStrategy("higher-first")
   .useCustomClone((data) => ({
     ...data,
     meta: { ...data.meta, tags: [...data.meta.tags] },
@@ -102,6 +113,8 @@ Builds the execution plan.
 
 - Throws `[EXFLOW_UNKNOWN_DEPENDENCY]` when a dependency id does not exist.
 - Throws `[EXFLOW_CYCLE_DETECTED]` when the graph has a cycle.
+
+Cycle errors now include a detected cycle path in the message when available.
 
 Returns:
 
@@ -153,6 +166,7 @@ Exported as `EXFLOW_ERROR`:
 - `EXFLOW_CYCLE_DETECTED`
 - `EXFLOW_CUSTOM_CLONE_FN_REQUIRED`
 - `EXFLOW_DEEP_CLONE_UNAVAILABLE`
+- `EXFLOW_INVALID_OPTION`
 
 ## License
 

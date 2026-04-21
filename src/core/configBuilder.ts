@@ -43,6 +43,46 @@ class ExFlowConfigBuilder<T extends object & ExFlowSafeData> {
     return this;
   }
 
+  withTieBreaker(tieBreaker: NonNullable<ExFlowOptions<T>["tieBreaker"]>): this {
+    this.options = {
+      ...this.options,
+      tieBreaker,
+    };
+    return this;
+  }
+
+  withConcurrencyCap(concurrencyCap: number): this {
+    this.options = {
+      ...this.options,
+      concurrencyCap,
+    };
+    return this;
+  }
+
+  withResourceCaps(resourceCaps: Record<string, number>): this {
+    this.options = {
+      ...this.options,
+      resourceCaps: { ...resourceCaps },
+    };
+    return this;
+  }
+
+  withDeadlineStrategy(deadlineStrategy: NonNullable<ExFlowOptions<T>["deadlineStrategy"]>): this {
+    this.options = {
+      ...this.options,
+      deadlineStrategy,
+    };
+    return this;
+  }
+
+  withWeightStrategy(weightStrategy: NonNullable<ExFlowOptions<T>["weightStrategy"]>): this {
+    this.options = {
+      ...this.options,
+      weightStrategy,
+    };
+    return this;
+  }
+
   build(): ExFlowOptions<T> {
     if (this.options.cloneMode === "custom" && !this.options.cloneFn) {
       throw new Error(

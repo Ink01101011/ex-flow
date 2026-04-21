@@ -26,10 +26,22 @@ export interface ExNode<T extends object & ExFlowSafeData> {
   dependsOn: string[];
   /** Optional priority used for ordering inside the same execution batch. */
   priority?: number;
+  /** Optional resource class used with resource cap constraints. */
+  resourceClass?: string;
+  /** Optional deadline score used by deadline ordering strategies. */
+  deadline?: number;
+  /** Optional weight score used by weight ordering strategies. */
+  weight?: number;
 }
 
 /** Clone policy used when ExFlow creates result items. */
 export type ExFlowCloneMode = "shallow" | "deep" | "custom";
+export type ExFlowTieBreaker<T extends object & ExFlowSafeData> = (
+  a: Readonly<ExNode<T>>,
+  b: Readonly<ExNode<T>>,
+) => number;
+export type DeadlineStrategy = "earliest-first" | "latest-first";
+export type WeightStrategy = "higher-first" | "lower-first";
 
 /**
  * Runtime options for ExFlow.
@@ -50,6 +62,27 @@ export interface ExFlowOptions<T extends object & ExFlowSafeData> {
    * Defaults to `false` (higher priority first).
    */
   priorityAscending?: boolean;
+  /**
+   * Optional tie-breaker used when two nodes have the same priority.
+   * When provided, ExFlow switches to a compare-based sort implementation.
+   */
+  tieBreaker?: ExFlowTieBreaker<T>;
+  /**
+   * Optional maximum number of nodes allowed in a single emitted batch.
+   */
+  concurrencyCap?: number;
+  /**
+   * Optional per-resource-class caps for nodes emitted in the same batch.
+   */
+  resourceCaps?: Record<string, number>;
+  /**
+   * Optional strategy for ordering by node deadline.
+   */
+  deadlineStrategy?: DeadlineStrategy;
+  /**
+   * Optional strategy for ordering by node weight.
+   */
+  weightStrategy?: WeightStrategy;
 }
 
 /**

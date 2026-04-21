@@ -14,4 +14,6 @@ export const EXFLOW_ERROR = {
   CUSTOM_CLONE_FN_REQUIRED: "EXFLOW_CUSTOM_CLONE_FN_REQUIRED",
   /** Deep clone was requested in a runtime without structuredClone. */
   DEEP_CLONE_UNAVAILABLE: "EXFLOW_DEEP_CLONE_UNAVAILABLE",
+  /** Runtime options contain invalid values. */
+  INVALID_OPTION: "EXFLOW_INVALID_OPTION",
 } as const;
