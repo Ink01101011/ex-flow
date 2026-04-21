@@ -3,12 +3,23 @@
   "version": "1.0.3",
   "description": "Dependency-graph execution planner using Kahn's Algorithm with priority-aware batching",
   "keywords": [
+    "batch-scheduler",
+    "critical-path",
+    "cycle-detection",
     "dag",
     "dependency-graph",
+    "dependency-resolver",
     "execution-plan",
+    "fairness",
+    "job-scheduler",
     "kahn-algorithm",
+    "observability",
+    "orchestrator",
+    "priority-scheduling",
+    "resource-aware",
     "scheduler",
     "task-scheduler",
+    "throughput-scheduler",
     "topological-sort",
     "typescript",
     "workflow"
@@ -18,7 +29,7 @@
     "url": "https://github.com/Ink01101011/ex-flow/issues"
   },
   "license": "MIT",
-  "author": "",
+  "author": "Ink01101011",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Ink01101011/ex-flow.git"

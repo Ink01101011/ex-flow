@@ -2,6 +2,15 @@
 
 Priority-aware DAG execution planner for TypeScript based on Kahn's Algorithm.
 
+[![npm version](https://img.shields.io/npm/v/ex-flow.svg)](https://www.npmjs.com/package/ex-flow)
+[![npm downloads](https://img.shields.io/npm/dw/ex-flow.svg)](https://www.npmjs.com/package/ex-flow)
+[![Coverage](https://img.shields.io/codecov/c/github/Ink01101011/ex-flow)](https://codecov.io/gh/Ink01101011/ex-flow)
+[![Bundle Size](https://img.shields.io/bundlephobia/minzip/ex-flow)](https://bundlephobia.com/package/ex-flow)
+[![License](https://img.shields.io/npm/l/ex-flow.svg)](LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/Ink01101011/ex-flow/ci.yml)](https://github.com/Ink01101011/ex-flow/actions/workflows/ci.yml)
+
+`ex-flow` is a TypeScript DAG scheduler, dependency resolver, and topological sort engine for workflow orchestration. It builds deterministic execution plans from directed acyclic graphs (DAGs) using Kahn's Algorithm, then emits both parallelizable execution batches and a flattened ordered sequence. The scheduler supports priority-aware ordering, deadline and weight strategies, fairness controls, throughput mode, resource-aware constraints, and cycle detection diagnostics. Use it for worker job orchestration, CI pipeline dependency graphs, ETL stage scheduling, and any task scheduler that needs predictable dependency-graph execution with observability-friendly errors.
+
 `ex-flow` helps you model task dependencies and produce:
 
 - `batches`: execution levels where nodes in the same batch can run in parallel
@@ -21,6 +30,20 @@ Within each batch, tasks are sorted by priority (higher first).
 - Structured diagnostics via `ExFlowRuntimeError`
 - Fairness controls (`aging`, `maxDeferralRounds`) for constrained throughput scheduling
 - Preset profiles for enterprise-ready defaults
+
+## Use Cases
+
+- Workflow orchestration where tasks have hard dependency ordering
+- Worker runtime scheduling with per-resource-class limits
+- CI or release pipelines that need deterministic execution batches
+- ETL or data processing stages with priority, deadline, and fairness constraints
+
+## Why ex-flow
+
+- Deterministic Kahn-style topological planning with clear batch outputs
+- Multi-layer tie resolution chain for stable and explainable ordering
+- Runtime diagnostics and observability adapters for production operations
+- Throughput and fairness controls to reduce starvation under constraints
 
 ## Installation
 
