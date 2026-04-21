@@ -1,6 +1,6 @@
 {
   "name": "ex-flow",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Dependency-graph execution planner using Kahn's Algorithm with priority-aware batching",
   "keywords": [
     "batch-scheduler",
