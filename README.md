@@ -201,6 +201,46 @@ Recommended observability fields:
 - `diagnostics.unresolvedNodeIds`: impact scope
 - `diagnostics.invalidOptionField` + `invalidOptionValue`: config hygiene dashboards
 
+### Integration: API Server
+
+Example with OpenTelemetry-style attributes:
+
+```ts
+import { ExFlow, serializeExFlowError, toOpenTelemetryAttributes } from "ex-flow";
+
+const flow = new ExFlow<{ name: string }>();
+
+try {
+  flow.resolveExecutionPlan();
+} catch (error) {
+  const event = serializeExFlowError(error);
+  const attributes = toOpenTelemetryAttributes(event);
+
+  // Example: span.recordException + span.setAttributes
+  console.log("otel.attributes", attributes);
+}
+```
+
+### Integration: Worker Runtime
+
+Example with Datadog-style log fields:
+
+```ts
+import { ExFlow, serializeExFlowError, toDatadogLogFields } from "ex-flow";
+
+const flow = new ExFlow<{ name: string }>();
+
+try {
+  flow.resolveExecutionPlan();
+} catch (error) {
+  const event = serializeExFlowError(error);
+  const logFields = toDatadogLogFields(event);
+
+  // Example: logger.error(logFields)
+  console.log("worker.log", JSON.stringify(logFields));
+}
+```
+
 Returns:
 
 - `batches: ExFlowResultItem<T>[][]`

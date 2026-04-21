@@ -33,3 +33,6 @@ export interface ExFlowObservabilityEvent {
   diagnostics?: ExFlowDiagnostics;
   timestamp: string;
 }
+
+export type ExFlowOpenTelemetryAttributes = Record<string, string | number | boolean>;
+export type ExFlowDatadogLogFields = Record<string, string | number | boolean | null>;

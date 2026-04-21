@@ -11,6 +11,7 @@ export { default as ExFlowRuntimeError } from "./errors/exFlowRuntimeError";
 
 // utils
 export { serializeExFlowError } from "./utils";
+export { toDatadogLogFields, toOpenTelemetryAttributes } from "./utils";
 
 // types
 export type {
@@ -20,7 +21,9 @@ export type {
   ExFlowExecutionDetails,
   ExFlowFairnessPolicy,
   ExFlowCloneMode,
+  ExFlowDatadogLogFields,
   ExFlowMetrics,
+  ExFlowOpenTelemetryAttributes,
   ExFlowObservabilityEvent,
   ExFlowOptions,
   ExFlowPresetName,

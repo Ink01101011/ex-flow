@@ -5,7 +5,7 @@ import { createExFlowConfigBuilder } from "../core/configBuilder";
 import { getExFlowPreset } from "../core/presets";
 import ExFlow from "../core/exFlow";
 import ExFlowRuntimeError from "../errors/exFlowRuntimeError";
-import { serializeExFlowError } from "../utils";
+import { serializeExFlowError, toDatadogLogFields, toOpenTelemetryAttributes } from "../utils";
 
 type Task = { name: string };
 
@@ -557,5 +557,60 @@ test("serializeExFlowError returns fallback payload for unknown errors", () => {
     message: "boom",
     name: "UnknownError",
     timestamp: "2026-04-21T00:00:00.000Z",
+  });
+});
+
+test("toOpenTelemetryAttributes maps diagnostics payload", () => {
+  const event = serializeExFlowError(
+    new ExFlowRuntimeError("EXFLOW_CYCLE_DETECTED", "cycle", {
+      cyclePath: ["A", "B", "A"],
+      unresolvedNodeIds: ["A", "B"],
+      invalidOptionField: "resourceCaps.cpu",
+      invalidOptionValue: 0,
+      details: "invalid resource cap",
+    }),
+    "2026-04-21T00:00:00.000Z",
+  );
+
+  const attrs = toOpenTelemetryAttributes(event);
+
+  assert.deepEqual(attrs, {
+    "exflow.source": "ex-flow",
+    "exflow.name": "ExFlowRuntimeError",
+    "exflow.message": "[EXFLOW_CYCLE_DETECTED] cycle",
+    "exflow.timestamp": "2026-04-21T00:00:00.000Z",
+    "exflow.code": "EXFLOW_CYCLE_DETECTED",
+    "exflow.cycle_path": "A->B->A",
+    "exflow.unresolved_nodes": "A,B",
+    "exflow.invalid_option_field": "resourceCaps.cpu",
+    "exflow.invalid_option_value": "0",
+    "exflow.details": "invalid resource cap",
+  });
+});
+
+test("toDatadogLogFields maps diagnostics payload", () => {
+  const event = serializeExFlowError(
+    new ExFlowRuntimeError("EXFLOW_INVALID_OPTION", "bad option", {
+      invalidOptionField: "concurrencyCap",
+      invalidOptionValue: 0,
+    }),
+    "2026-04-21T00:00:00.000Z",
+  );
+
+  const fields = toDatadogLogFields(event);
+
+  assert.deepEqual(fields, {
+    source: "ex-flow",
+    service: "ex-flow",
+    status: "error",
+    error_code: "EXFLOW_INVALID_OPTION",
+    error_name: "ExFlowRuntimeError",
+    message: "[EXFLOW_INVALID_OPTION] bad option",
+    timestamp: "2026-04-21T00:00:00.000Z",
+    diagnostics_cycle_path: null,
+    diagnostics_unresolved_nodes: null,
+    diagnostics_invalid_option_field: "concurrencyCap",
+    diagnostics_invalid_option_value: "0",
+    diagnostics_details: null,
   });
 });
