@@ -81,6 +81,19 @@ Options:
 - `requireResourceCapForAllClasses?: boolean`
 - `presetName?: "stable-enterprise" | "high-throughput" | "strict-fairness"`
 
+Ordering semantics for `priorityAscending`, `deadlineStrategy`, and `weightStrategy`:
+
+- They are not overlapping switches; they are evaluated as a tie-resolution chain.
+- `priorityAscending` always controls the primary priority direction.
+- `deadlineStrategy` is applied only when two nodes have equal priority.
+- `weightStrategy` is applied only when both priority and deadline comparisons are tied.
+
+Quick example:
+
+- Node A: `priority=10`, `deadline=100`, `weight=1`
+- Node B: `priority=9`, `deadline=1`, `weight=999`
+- With default `priorityAscending: false`, Node A still runs before Node B because priority is the first comparator.
+
 ### `createExFlowConfigBuilder<T>()`
 
 Builds `ExFlow` options with a fluent API.

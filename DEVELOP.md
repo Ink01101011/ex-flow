@@ -42,3 +42,8 @@ Before each consumer-facing release:
    - Record round count and deferred node trends for regressions.
 4. Validate fairness behavior:
    - Ensure aging + max deferral scenarios are covered by tests.
+
+## Next Release Notes
+
+- Consider adding a multi-objective comparator order profile so `priority` is not always the primary ordering dimension.
+  - Example direction: configurable comparator precedence (for example `deadline -> weight -> priority`) while preserving deterministic fallback behavior.
