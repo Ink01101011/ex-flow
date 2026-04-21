@@ -40,7 +40,8 @@ class ExFlowConfigBuilder<T extends object & ExFlowSafeData> {
   }
 }
 
-export const createExFlowConfigBuilder = <T extends object & ExFlowSafeData>(): ExFlowConfigBuilder<T> =>
-  new ExFlowConfigBuilder<T>();
+export const createExFlowConfigBuilder = <
+  T extends object & ExFlowSafeData,
+>(): ExFlowConfigBuilder<T> => new ExFlowConfigBuilder<T>();
 
 export default ExFlowConfigBuilder;

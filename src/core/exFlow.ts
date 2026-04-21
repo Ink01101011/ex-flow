@@ -18,7 +18,7 @@ class ExFlow<T extends object & ExFlowSafeData> {
   /**
    * Adds a node into the graph.
    * @throws Error if the node id already exists.
-    * @throws Error if `data` contains the reserved `exFlowPriority` field.
+   * @throws Error if `data` contains the reserved `exFlowPriority` field.
    */
   addEntity(node: ExNode<T>): void {
     if (this.nodes.has(node.id)) {
