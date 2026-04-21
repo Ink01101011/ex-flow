@@ -66,6 +66,14 @@
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"
   },
+  "peerDependencies": {
+    "exsorted": "^1.1.0"
+  },
+  "peerDependenciesMeta": {
+    "exsorted": {
+      "optional": true
+    }
+  },
   "engines": {
     "node": ">=18"
   },
