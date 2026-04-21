@@ -47,26 +47,6 @@ export type ExFlowTieFallbackPolicy = "insertion" | "id-asc" | "id-desc";
 export type ExFlowFairnessPolicy = "none" | "aging";
 export type ExFlowPresetName = "stable-enterprise" | "high-throughput" | "strict-fairness";
 
-export interface ExFlowDiagnostics {
-  cyclePath?: string[];
-  unresolvedNodeIds?: string[];
-  invalidOptionField?: string;
-  invalidOptionValue?: unknown;
-  details?: string;
-}
-
-export interface ExFlowMetrics {
-  schedulerMode: ExFlowSchedulerMode;
-  rounds: number;
-  emittedNodes: number;
-  deferredNodes: number;
-  maxReadyQueueSize: number;
-  constraintHits: {
-    concurrencyCap: number;
-    resourceCaps: number;
-  };
-}
-
 /**
  * Runtime options for ExFlow.
  */
@@ -154,9 +134,4 @@ export type ExFlowResultItem<T extends object & ExFlowSafeData> = Omit<T, "exFlo
 export interface ExecutionPlan<T extends object & ExFlowSafeData> {
   batches: ExFlowResultItem<T>[][];
   fullSequence: ExFlowResultItem<T>[];
-}
-
-export interface ExFlowExecutionDetails<T extends object & ExFlowSafeData> {
-  plan: ExecutionPlan<T>;
-  metrics: ExFlowMetrics;
 }

@@ -1,8 +1,18 @@
+// constants
 export { EXFLOW_ERROR } from "./constants";
+
+// core
 export { default as ExFlow } from "./core/exFlow";
 export { default as ExFlowConfigBuilder, createExFlowConfigBuilder } from "./core/configBuilder";
 export { getExFlowPreset } from "./core/presets";
+
+// errors
 export { default as ExFlowRuntimeError } from "./errors/exFlowRuntimeError";
+
+// utils
+export { serializeExFlowError } from "./utils";
+
+// types
 export type {
   DeadlineStrategy,
   ExecutionPlan,
@@ -11,6 +21,7 @@ export type {
   ExFlowFairnessPolicy,
   ExFlowCloneMode,
   ExFlowMetrics,
+  ExFlowObservabilityEvent,
   ExFlowOptions,
   ExFlowPresetName,
   ExFlowSchedulerMode,

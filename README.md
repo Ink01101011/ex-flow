@@ -151,6 +151,56 @@ Cycle errors now include a detected cycle path in the message when available.
 
 Structured diagnostics are available through `ExFlowRuntimeError.diagnostics`.
 
+## Diagnostics Serialization Guide
+
+Use `serializeExFlowError` to normalize runtime errors before forwarding to your observability stack.
+
+```ts
+import {
+  ExFlow,
+  ExFlowRuntimeError,
+  serializeExFlowError,
+  type ExFlowObservabilityEvent,
+} from "ex-flow";
+
+const flow = new ExFlow<{ name: string }>();
+
+try {
+  flow.addEntity({ id: "A", dependsOn: ["B"], data: { name: "Task A" } });
+  flow.addEntity({ id: "B", dependsOn: ["A"], data: { name: "Task B" } });
+  flow.resolveExecutionPlan();
+} catch (error) {
+  const event: ExFlowObservabilityEvent = serializeExFlowError(error);
+
+  // Example mapping
+  console.log(
+    JSON.stringify({
+      level: "error",
+      service: "scheduler-service",
+      error_code: event.code,
+      error_name: event.name,
+      message: event.message,
+      diagnostics: event.diagnostics,
+      ts: event.timestamp,
+    }),
+  );
+
+  if (error instanceof ExFlowRuntimeError) {
+    // Domain-specific handling for cycle errors
+    if (error.code === "EXFLOW_CYCLE_DETECTED") {
+      console.error("Cycle path:", error.diagnostics?.cyclePath);
+    }
+  }
+}
+```
+
+Recommended observability fields:
+
+- `error_code`: `EXFLOW_*` code for alert grouping
+- `diagnostics.cyclePath`: direct cycle troubleshooting
+- `diagnostics.unresolvedNodeIds`: impact scope
+- `diagnostics.invalidOptionField` + `invalidOptionValue`: config hygiene dashboards
+
 Returns:
 
 - `batches: ExFlowResultItem<T>[][]`

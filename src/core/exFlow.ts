@@ -169,19 +169,9 @@ class ExFlow<T extends object & ExFlowSafeData> {
 
         currentBatch.push(this.toPlannedNode(id, node));
 
-        const neighbors = adjacencyList.get(id) || [];
-        for (const neighborId of neighbors) {
-          const degree = inDegree.get(neighborId);
-          if (degree === undefined) {
-            continue;
-          }
-
-          const nextDegree = degree - 1;
-          inDegree.set(neighborId, nextDegree);
-          if (nextDegree === 0) {
-            nextQueue.push(neighborId);
-          }
-        }
+        this.resolveNeighbors(id, inDegree, adjacencyList, (neighborId) => {
+          nextQueue.push(neighborId);
+        });
       }
 
       const sortedBatch = this.sortBatch(currentBatch);
@@ -247,19 +237,9 @@ class ExFlow<T extends object & ExFlowSafeData> {
 
       for (const plannedNode of selection.batch) {
         readyNodeIds.delete(plannedNode.id);
-        const neighbors = adjacencyList.get(plannedNode.id) || [];
-        for (const neighborId of neighbors) {
-          const degree = inDegree.get(neighborId);
-          if (degree === undefined) {
-            continue;
-          }
-
-          const nextDegree = degree - 1;
-          inDegree.set(neighborId, nextDegree);
-          if (nextDegree === 0) {
-            readyNodeIds.add(neighborId);
-          }
-        }
+        this.resolveNeighbors(plannedNode.id, inDegree, adjacencyList, (neighborId) => {
+          readyNodeIds.add(neighborId);
+        });
       }
     }
 
@@ -596,6 +576,27 @@ class ExFlow<T extends object & ExFlowSafeData> {
     }
 
     return (usage[node.resourceClass] ?? 0) < cap;
+  }
+
+  private resolveNeighbors(
+    nodeId: string,
+    inDegree: Map<string, number>,
+    adjacencyList: Map<string, string[]>,
+    onNodeReady: (neighborId: string) => void,
+  ): void {
+    const neighbors = adjacencyList.get(nodeId) || [];
+    for (const neighborId of neighbors) {
+      const degree = inDegree.get(neighborId);
+      if (degree === undefined) {
+        continue;
+      }
+
+      const nextDegree = degree - 1;
+      inDegree.set(neighborId, nextDegree);
+      if (nextDegree === 0) {
+        onNodeReady(neighborId);
+      }
+    }
   }
 
   private toResultItem(node: PlannedNode<T>): ExFlowResultItem<T> {

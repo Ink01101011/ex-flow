@@ -5,6 +5,7 @@ import { createExFlowConfigBuilder } from "../core/configBuilder";
 import { getExFlowPreset } from "../core/presets";
 import ExFlow from "../core/exFlow";
 import ExFlowRuntimeError from "../errors/exFlowRuntimeError";
+import { serializeExFlowError } from "../utils";
 
 type Task = { name: string };
 
@@ -525,4 +526,36 @@ test("property: random DAG always respects topological order and deterministic o
       }
     }
   }
+});
+
+test("serializeExFlowError returns structured payload for ExFlowRuntimeError", () => {
+  const error = new ExFlowRuntimeError("EXFLOW_INVALID_OPTION", "invalid option", {
+    invalidOptionField: "concurrencyCap",
+    invalidOptionValue: 0,
+  });
+
+  const serialized = serializeExFlowError(error, "2026-04-21T00:00:00.000Z");
+
+  assert.deepEqual(serialized, {
+    source: "ex-flow",
+    code: "EXFLOW_INVALID_OPTION",
+    message: "[EXFLOW_INVALID_OPTION] invalid option",
+    name: "ExFlowRuntimeError",
+    diagnostics: {
+      invalidOptionField: "concurrencyCap",
+      invalidOptionValue: 0,
+    },
+    timestamp: "2026-04-21T00:00:00.000Z",
+  });
+});
+
+test("serializeExFlowError returns fallback payload for unknown errors", () => {
+  const serialized = serializeExFlowError("boom", "2026-04-21T00:00:00.000Z");
+
+  assert.deepEqual(serialized, {
+    source: "ex-flow",
+    message: "boom",
+    name: "UnknownError",
+    timestamp: "2026-04-21T00:00:00.000Z",
+  });
 });
