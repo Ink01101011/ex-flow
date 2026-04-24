@@ -16,6 +16,8 @@
     "observability",
     "orchestrator",
     "priority-scheduling",
+    "react",
+    "react-hooks",
     "resource-aware",
     "scheduler",
     "task-scheduler",
