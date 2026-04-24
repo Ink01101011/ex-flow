@@ -1,6 +1,6 @@
 {
   "name": "ex-flow",
-  "version": "1.0.4",
+  "version": "1.1.0",
   "description": "Dependency-graph execution planner using Kahn's Algorithm with priority-aware batching",
   "keywords": [
     "batch-scheduler",
@@ -16,6 +16,8 @@
     "observability",
     "orchestrator",
     "priority-scheduling",
+    "react",
+    "react-hooks",
     "resource-aware",
     "scheduler",
     "task-scheduler",
@@ -39,12 +41,25 @@
     "README.md"
   ],
   "sideEffects": false,
-  "main": "dist/index.js",
+  "main": "dist/index.cjs",
+  "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs",
+      "default": "./dist/index.mjs"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "import": "./dist/react/index.mjs",
+      "require": "./dist/react/index.cjs",
+      "default": "./dist/react/index.mjs"
+    },
+    "./types": {
+      "types": "./dist/types/index.d.ts",
+      "default": "./dist/types/index.d.ts"
     }
   },
   "publishConfig": {
@@ -53,7 +68,8 @@
   "scripts": {
     "test": "tsx --test src/**/*.test.ts",
     "dev": "tsx src/playground.ts",
-    "build": "tsc -p tsconfig.json",
+    "build": "tsup --config tsup.config.ts",
+    "minify": "tsup --config tsup.config.ts --minify",
     "bench": "tsx scripts/benchmark.ts",
     "clean": "rm -rf dist",
     "lint": "oxlint .",
@@ -63,25 +79,32 @@
     "prepare": "husky",
     "ci": "pnpm run format:check && pnpm run lint && pnpm run test && pnpm run build",
     "prepublish:check": "pnpm run clean && pnpm run ci && npm pack --dry-run",
-    "prepublishOnly": "pnpm run prepublish:check",
-    "start": "node dist/index.js"
+    "prepublishOnly": "pnpm run prepublish:check && pnpm run minify",
+    "start": "node dist/index.cjs"
   },
   "dependencies": {
     "exsorted": "^1.1.0"
   },
   "devDependencies": {
     "@types/node": "^24.9.1",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
     "husky": "^9.1.7",
     "oxfmt": "^0.45.0",
     "oxlint": "^1.19.0",
+    "tsup": "^8.5.1",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"
   },
   "peerDependencies": {
-    "exsorted": "^1.1.0"
+    "exsorted": "^1.1.0",
+    "react": "^18.2.0 || ^19.0.0"
   },
   "peerDependenciesMeta": {
     "exsorted": {
+      "optional": true
+    },
+    "react": {
       "optional": true
     }
   },

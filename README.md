@@ -9,7 +9,9 @@ Priority-aware DAG execution planner for TypeScript based on Kahn's Algorithm.
 [![License](https://img.shields.io/npm/l/ex-flow.svg)](LICENSE)
 [![CI](https://img.shields.io/github/actions/workflow/status/Ink01101011/ex-flow/ci.yml)](https://github.com/Ink01101011/ex-flow/actions/workflows/ci.yml)
 
-`ex-flow` is a TypeScript DAG scheduler, dependency resolver, and topological sort engine for workflow orchestration. It builds deterministic execution plans from directed acyclic graphs (DAGs) using Kahn's Algorithm, then emits both parallelizable execution batches and a flattened ordered sequence. The scheduler supports priority-aware ordering, deadline and weight strategies, fairness controls, throughput mode, resource-aware constraints, and cycle detection diagnostics. Use it for worker job orchestration, CI pipeline dependency graphs, ETL stage scheduling, and any task scheduler that needs predictable dependency-graph execution with observability-friendly errors.
+`ex-flow` is a TypeScript DAG scheduler and dependency-graph planner powered by Kahn's Algorithm. It creates deterministic execution batches and a full topological sequence, with cycle detection and observability-ready diagnostics.
+
+Use it for workflow orchestration, job scheduling, CI dependency graphs, and ETL pipelines that require predictable ordering and clear runtime error context.
 
 `ex-flow` helps you model task dependencies and produce:
 
@@ -17,6 +19,8 @@ Priority-aware DAG execution planner for TypeScript based on Kahn's Algorithm.
 - `fullSequence`: flattened ordered list across all batches
 
 Within each batch, tasks are sorted by priority (higher first).
+
+This library is designed for teams searching for a TypeScript DAG scheduler, topological sort engine, dependency graph execution planner, and a React-friendly workflow orchestration helper.
 
 ## Features
 
@@ -80,6 +84,110 @@ const plan = flow.resolveExecutionPlan();
 console.log(plan.batches);
 console.log(plan.fullSequence);
 ```
+
+## React Integration (Tree-Shakable)
+
+For React apps, import from the React-only entrypoint:
+
+```ts
+import { useExFlow } from "ex-flow/react";
+```
+
+This keeps React utilities isolated from the core `ex-flow` entry and avoids mixing React exports into existing imports.
+
+## React Hook (`useExFlow`)
+
+`useExFlow<T>()` wraps a stable `ExFlow` instance and exposes helper functions for common React workflows.
+
+```ts
+import { useExFlow } from "ex-flow/react";
+
+type TaskData = { label: string };
+
+const { addEntities, mapDataToNodes, addFromData, resolvePlan, resolveDetails, getLastMetrics } =
+  useExFlow<TaskData>({ schedulerMode: "throughput", log: "error" });
+```
+
+Hook options (`UseExFlowOptions<T>`):
+
+- Accepts all `ExFlowOptions<T>` fields.
+- `log?: "debug" | "error"` (default: `"debug"`): selects which console method is used for serialized diagnostics logs in non-production.
+
+| Option             | Type                 | Default                 | Description                                                                                            |
+| ------------------ | -------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------ |
+| All ExFlow options | `ExFlowOptions<T>`   | Same as ExFlow defaults | Pass-through scheduler/config options (for example `schedulerMode`, `concurrencyCap`, `resourceCaps`). |
+| `log`              | `"debug" \| "error"` | `"debug"`               | Controls diagnostics logging method in non-production (`console.debug` or `console.error`).            |
+
+Hook API:
+
+| Method           | Input             | Returns                     | Purpose                                                                        |
+| ---------------- | ----------------- | --------------------------- | ------------------------------------------------------------------------------ |
+| `addEntities`    | `ExNode<T>[]`     | `void`                      | Add pre-built nodes directly into the internal ExFlow instance.                |
+| `mapDataToNodes` | `items`, `mapper` | `ExNode<T>[]`               | Convert arbitrary source data into ExFlow nodes without mutating ExFlow state. |
+| `addFromData`    | `items`, `mapper` | `ExNode<T>[]`               | Map source data to nodes and add them immediately in one step.                 |
+| `resolvePlan`    | -                 | `ExecutionPlan<T>`          | Resolve current graph state into execution batches and full sequence.          |
+| `resolveDetails` | -                 | `ExFlowExecutionDetails<T>` | Resolve plan and include runtime scheduling metrics.                           |
+| `getLastMetrics` | -                 | `ExFlowMetrics \| null`     | Read the latest metrics snapshot from the last resolve call.                   |
+
+Example mapping plain data into `ExNode` before adding:
+
+```ts
+type TaskInput = {
+  key: string;
+  deps?: string[];
+  label: string;
+  priority?: number;
+};
+
+const { mapDataToNodes, addEntities, resolvePlan } = useExFlow<{ label: string }>();
+
+const nodes = mapDataToNodes<TaskInput>(tasks, (item) => ({
+  id: item.key,
+  dependsOn: item.deps ?? [],
+  data: { label: item.label },
+  priority: item.priority,
+}));
+
+addEntities(nodes);
+const plan = resolvePlan();
+```
+
+Example map+add in one call:
+
+```ts
+type TaskInput = {
+  key: string;
+  deps?: string[];
+  label: string;
+  priority?: number;
+};
+
+const { addFromData, resolveDetails } = useExFlow<{ label: string }>();
+
+addFromData<TaskInput>(tasks, (item) => ({
+  id: item.key,
+  dependsOn: item.deps ?? [],
+  data: { label: item.label },
+  priority: item.priority,
+}));
+
+const { plan, metrics } = resolveDetails();
+console.log(plan.fullSequence);
+console.log(metrics);
+```
+
+Duplicate id caution (`addFromData`):
+
+- `addFromData` calls `addEntity` for each mapped node.
+- If your mapper produces repeated `id` values, ExFlow throws `[EXFLOW_DUPLICATE_NODE]`.
+- Prefer stable, globally unique ids from source data (for example database id or UUID).
+- If source data can repeat, dedupe before mapping or compose ids with a namespace key.
+
+Debug diagnostics logging:
+
+- In non-production environments, `useExFlow` logs serialized diagnostics with `serializeExFlowError` when `addEntities`, `addFromData`, `resolvePlan`, or `resolveDetails` throw.
+- Log level is controlled by `log` option: `log: "debug"` uses `console.debug`, `log: "error"` uses `console.error`.
+- This helps inspect `code`, `message`, and structured `diagnostics` fields quickly while debugging.
 
 ## API
 
@@ -187,7 +295,7 @@ Cycle errors now include a detected cycle path in the message when available.
 
 Structured diagnostics are available through `ExFlowRuntimeError.diagnostics`.
 
-## Diagnostics Serialization Guide
+## Diagnostics Serialization (Logging & Observability)
 
 Use `serializeExFlowError` to normalize runtime errors before forwarding to your observability stack.
 
