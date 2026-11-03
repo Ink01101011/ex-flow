@@ -650,45 +650,49 @@ class ExFlow<T extends object & ExFlowSafeData> {
     const stack: string[] = [];
     const stackIndex: Map<string, number> = new Map();
 
-    const walk = (nodeId: string): string[] | null => {
+    // Iterative DFS (explicit stack of frames with a neighbor cursor) so that
+    // cycle length is not bounded by the JS call stack.
+    const frames: Array<{ nodeId: string; neighbors: string[]; next: number }> = [];
+
+    const enter = (nodeId: string): void => {
       state.set(nodeId, 1);
       stackIndex.set(nodeId, stack.length);
       stack.push(nodeId);
+      frames.push({ nodeId, neighbors: adjacencyList.get(nodeId) || [], next: 0 });
+    };
 
-      const neighbors = adjacencyList.get(nodeId) || [];
-      for (const neighborId of neighbors) {
+    for (const rootId of unresolved) {
+      if ((state.get(rootId) ?? 0) !== 0) {
+        continue;
+      }
+
+      enter(rootId);
+
+      while (frames.length > 0) {
+        const frame = frames[frames.length - 1];
+
+        if (frame.next >= frame.neighbors.length) {
+          frames.pop();
+          stack.pop();
+          stackIndex.delete(frame.nodeId);
+          state.set(frame.nodeId, 2);
+          continue;
+        }
+
+        const neighborId = frame.neighbors[frame.next++];
         if (!unresolved.has(neighborId)) {
           continue;
         }
 
         const neighborState = state.get(neighborId) ?? 0;
         if (neighborState === 0) {
-          const path = walk(neighborId);
-          if (path) {
-            return path;
-          }
+          enter(neighborId);
         } else if (neighborState === 1) {
           const start = stackIndex.get(neighborId);
           if (start !== undefined) {
             return [...stack.slice(start), neighborId];
           }
         }
-      }
-
-      stack.pop();
-      stackIndex.delete(nodeId);
-      state.set(nodeId, 2);
-      return null;
-    };
-
-    for (const nodeId of unresolved) {
-      if ((state.get(nodeId) ?? 0) !== 0) {
-        continue;
-      }
-
-      const cyclePath = walk(nodeId);
-      if (cyclePath) {
-        return cyclePath;
       }
     }
 

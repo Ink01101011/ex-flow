@@ -679,3 +679,29 @@ test("createDiagnosticsMapper supports value transform", () => {
   assert.equal(mapped.invalidOptionValue, "value:0");
   assert.equal(mapped.cyclePath, null);
 });
+
+test("long dependency cycle reports EXFLOW_CYCLE_DETECTED instead of overflowing the stack", () => {
+  const n = 20000;
+  const flow = new ExFlow<Task>();
+
+  for (let i = 0; i < n; i++) {
+    flow.addEntity({
+      id: `n${i}`,
+      dependsOn: [`n${(i + n - 1) % n}`],
+      data: { name: `Task ${i}` },
+    });
+  }
+
+  try {
+    flow.resolveExecutionDetails();
+    assert.fail("expected cycle error");
+  } catch (error) {
+    assert.equal(error instanceof ExFlowRuntimeError, true);
+    const exError = error as ExFlowRuntimeError;
+    assert.equal(exError.code, "EXFLOW_CYCLE_DETECTED");
+    const cyclePath = exError.diagnostics?.cyclePath ?? [];
+    assert.equal(cyclePath.length, n + 1);
+    assert.equal(cyclePath[0], cyclePath[cyclePath.length - 1]);
+    assert.equal(exError.diagnostics?.unresolvedNodeIds?.length, n);
+  }
+});
